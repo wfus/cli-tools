@@ -12,6 +12,46 @@
 
 ## JSON Structure Analysis (Post-June 4 Format)
 
+### Important: Multiple Entry Types Exist
+
+There are at least 3 different entry types in the JSONL files:
+
+1. **Summary Entries** (type: "summary"):
+```json
+{
+  "type": "summary",
+  "summary": "Brief description of conversation",
+  "leafUuid": "uuid-string"
+}
+```
+
+2. **Older Format Messages** (missing message.id):
+```json
+{
+  "type": "user" | "assistant",
+  "uuid": "unique identifier",
+  "message": {
+    "role": "user" | "assistant",
+    "content": [...],
+    // Note: No "id" field in older format
+  }
+}
+```
+
+3. **Current Format Messages** (complete structure):
+```json
+{
+  "type": "user" | "assistant",
+  "uuid": "unique identifier",
+  "message": {
+    "id": "msg_...",  // This field is missing in older messages
+    "role": "user" | "assistant",
+    "model": "claude-...",
+    "usage": { ... }
+  }
+}
+```
+
 ### Key Fields in Each Entry:
 ```json
 {
@@ -60,6 +100,23 @@
    - Model `<synthetic>` appears for some system messages
    - Tool use results stored in separate entries
 
+## Known Issues and Solutions
+
+### Malformed Entry Warnings
+
+The tool will show warnings like:
+```
+Skipping malformed entry in file.jsonl line X: missing field `uuid` at line 1 column Y
+Skipping malformed entry in file.jsonl line X: missing field `id` at line 1 column Y
+```
+
+These are expected for:
+1. **Summary entries** - Don't have `uuid` field (they have `leafUuid` instead)
+2. **Older format messages** - Don't have `message.id` field
+3. **Continued conversations** - May have different structure
+
+**Current behavior**: The parser skips these entries and continues processing valid entries. This is intentional to maintain compatibility with different Claude CLI versions.
+
 ## Development Progress Log
 - 2025-06-12 11:55: Initial repository structure created
 - 2025-06-12 11:55: Analyzed JSONL format - identified key fields for token counting and deduplication
@@ -72,3 +129,11 @@
   - Date range filtering and model filtering
   - Summary statistics display
 - 2025-06-12 12:10: First successful run processed 16,242 requests totaling $3,642.61
+- 2025-01-06 17:10: Documented multiple message formats found in JSONL files:
+  - Summary entries (type: "summary") without uuid/message fields
+  - Older format messages missing message.id field
+  - Current format with complete structure
+- 2025-01-06 17:15: Updated parser to handle different message types gracefully:
+  - Silently skip summary entries (no usage data)
+  - Suppress warnings for known missing fields (id, uuid)
+  - Only warn about truly unexpected formats

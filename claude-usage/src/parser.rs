@@ -102,6 +102,14 @@ impl LogParser {
                 continue;
             }
 
+            // First check if this is a known alternative format
+            if let Ok(json_value) = serde_json::from_str::<serde_json::Value>(&line) {
+                // Skip summary entries - they don't contain usage data
+                if json_value.get("type").and_then(|t| t.as_str()) == Some("summary") {
+                    continue;
+                }
+            }
+
             match serde_json::from_str::<LogEntry>(&line) {
                 Ok(entry) => {
                     // Only include assistant messages with usage data
@@ -114,14 +122,19 @@ impl LogParser {
                     }
                 }
                 Err(e) => {
-                    // Skip malformed entries silently unless it's a parsing error we care about
+                    // Only warn about parsing errors for non-summary entries
+                    // and only for the first few lines to avoid spam
                     if line_num < 5 {
-                        eprintln!(
-                            "Skipping malformed entry in {} line {}: {}",
-                            path.display(),
-                            line_num + 1,
-                            e
-                        );
+                        // Check if it's a known issue (missing fields in older formats)
+                        let error_str = e.to_string();
+                        if !error_str.contains("missing field `id`") && !error_str.contains("missing field `uuid`") {
+                            eprintln!(
+                                "Skipping unexpected entry format in {} line {}: {}",
+                                path.display(),
+                                line_num + 1,
+                                e
+                            );
+                        }
                     }
                 }
             }
