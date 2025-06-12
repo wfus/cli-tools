@@ -1,0 +1,40 @@
+[package]
+name = "claude-usage"
+version = "0.1.0"
+edition = "2021"
+authors = ["Your Name"]
+description = "Analyze Claude Code usage and costs from local logs"
+
+[dependencies]
+# JSON parsing
+serde = { version = "1.0", features = ["derive"] }
+serde_json = "1.0"
+
+# CLI interface
+clap = { version = "4.5", features = ["derive"] }
+
+# Date/time handling
+chrono = { version = "0.4", features = ["serde"] }
+
+# File system
+walkdir = "2.5"
+
+# HTTP client for pricing API
+reqwest = { version = "0.12", features = ["json", "rustls-tls"] }
+
+# Async runtime
+tokio = { version = "1.40", features = ["full"] }
+
+# Error handling
+anyhow = "1.0"
+thiserror = "1.0"
+
+# Output formatting
+prettytable-rs = "0.10"
+colored = "2.1"
+
+# Progress bars
+indicatif = "0.17"
+
+# Path expansion
+shellexpand = "3.1"
