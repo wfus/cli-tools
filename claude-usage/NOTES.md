@@ -163,3 +163,28 @@ These are expected for:
   - `Message` struct
   - `ModelPricing` keys
   - Model filter in CLI args and dashboard
+
+## TODO: Implement fetch_latest_pricing
+
+### Complete the Anthropic API Integration
+- Currently `fetch_latest_pricing()` just returns hardcoded values
+- Need to implement actual API call to fetch current pricing
+- Considerations:
+  - Anthropic may not have a public pricing API
+  - Could scrape from documentation page
+  - Could use a community-maintained pricing feed
+  - Cache pricing data locally with expiration
+- Implementation approach:
+  ```rust
+  // Option 1: Official API (if available)
+  let response = reqwest::get("https://api.anthropic.com/v1/pricing").await?;
+  
+  // Option 2: Scrape docs page
+  let html = reqwest::get("https://docs.anthropic.com/en/docs/about-claude/models").await?;
+  // Parse HTML for pricing table
+  
+  // Option 3: Community API
+  let response = reqwest::get("https://community-api.com/anthropic-pricing").await?;
+  ```
+- Add caching to avoid hitting API too frequently
+- Fallback to hardcoded values if API fails

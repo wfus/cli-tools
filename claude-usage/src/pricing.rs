@@ -61,6 +61,28 @@ pub fn get_default_pricing() -> PricingMap {
         },
     );
 
+    // Claude Sonnet 4
+    pricing.insert(
+        "claude-sonnet-4-20250514".to_string(),
+        ModelPricing {
+            input_per_million: 3.0,
+            output_per_million: 15.0,
+            cache_write_per_million: 3.75,
+            cache_read_per_million: 0.30,
+        },
+    );
+
+    // Claude 3.7 Sonnet (older version from logs)
+    pricing.insert(
+        "claude-3-7-sonnet-20250219".to_string(),
+        ModelPricing {
+            input_per_million: 3.0,
+            output_per_million: 15.0,
+            cache_write_per_million: 3.75,
+            cache_read_per_million: 0.30,
+        },
+    );
+
     // Claude 3 Haiku
     pricing.insert(
         "claude-3-haiku-20240307".to_string(),
