@@ -75,7 +75,7 @@ fn draw_main_content(f: &mut Frame, area: Rect, app: &mut App) {
         .direction(Direction::Vertical)
         .constraints(
             [
-                Constraint::Length(12),  // Chart
+                Constraint::Length(16),  // Chart (increased from 12)
                 Constraint::Min(5),      // Feed
             ]
             .as_ref(),
@@ -97,13 +97,13 @@ fn draw_help(f: &mut Frame, area: Rect) {
         Span::styled("m", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
         Span::raw("]odel ["),
         Span::styled("t", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Span::raw("]ime-range ["),
+        Span::raw("]ime ["),
+        Span::styled("c", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
+        Span::raw("]hart ["),
         Span::styled("↑↓", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
         Span::raw("] scroll ["),
         Span::styled("p", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Span::raw("]ause ["),
-        Span::styled("h", Style::default().fg(Color::Yellow).add_modifier(Modifier::BOLD)),
-        Span::raw("]elp"),
+        Span::raw("]ause"),
     ];
 
     let help = Paragraph::new(Line::from(help_text))

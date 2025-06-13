@@ -9,7 +9,7 @@ use ratatui::{
 use crate::dashboard::app::App;
 
 pub fn draw_summary_bar(f: &mut Frame, area: Rect, app: &App) {
-    let (total_cost, model_costs) = app.rolling_window.get_24h_stats();
+    let (total_cost, model_costs) = app.rolling_window.get_24h_stats_simple();
 
     let mut spans = vec![
         Span::raw("Total: "),

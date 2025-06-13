@@ -10,6 +10,9 @@ pub fn handle_key_event(key: KeyEvent, app: &mut App) {
         KeyCode::Char('t') => {
             app.cycle_time_range();
         }
+        KeyCode::Char('c') => {
+            app.toggle_chart_type();
+        }
         KeyCode::Up => {
             app.scroll_feed_up();
         }
