@@ -26,3 +26,18 @@
     - Only warn about truly unexpected formats
   - Documented all findings in NOTES.md for future reference
   - Result: Cleaner output with less noise while maintaining compatibility
+
+## 2025-01-06 18:00
+
+- Fixed daily/weekly/monthly aggregation to properly sum costs across all models
+  - When grouping by day/week/month, now shows "all" as model and aggregates correctly
+  - Calculates cost per-model when aggregating to ensure accurate pricing
+  
+- Created detailed specification for terminal UI dashboard
+  - Real-time monitoring with rolling 60-minute window
+  - Per-minute cost buckets for granular tracking
+  - Model filtering (All/Opus/Sonnet/Haiku) with 'm' key
+  - Live request feed showing individual API calls
+  - Multiple time ranges (1h/2h/6h/12h/24h)
+  - Uses ratatui for cross-platform terminal UI
+  - Planned file watcher for real-time JSONL updates
