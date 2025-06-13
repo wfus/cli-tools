@@ -1,4 +1,5 @@
 use crate::file_tracker::FileTracker;
+use crate::incremental_parser::IncrementalParsing;
 use crate::model_name::ModelName;
 use crate::parser::LogParser;
 use crate::pricing::get_default_pricing;
@@ -73,8 +74,8 @@ pub struct App {
     // 2. Storing only recent UUIDs with a time-based eviction
     // 3. Using u128 or [u8; 16] for UUID storage instead of String
     seen_request_ids: HashSet<String>,
-    file_tracker: Option<FileTracker>,
-    use_incremental: bool,
+    _file_tracker: Option<FileTracker>,
+    _use_incremental: bool,
 }
 
 impl App {
@@ -89,9 +90,12 @@ impl App {
         };
 
         // Initialize file tracker for incremental parsing
-        let state_file = PathBuf::from(&claude_dir)
-            .join(".claude-usage")
-            .join("dashboard-file-tracker.json");
+        let state_dir = PathBuf::from(&claude_dir).join(".claude-usage");
+        // Create state directory if it doesn't exist
+        if let Err(e) = std::fs::create_dir_all(&state_dir) {
+            eprintln!("Warning: Failed to create state directory: {}", e);
+        }
+        let state_file = state_dir.join("dashboard-file-tracker.json");
         let file_tracker = FileTracker::with_persistence(state_file);
         
         Self {
@@ -108,26 +112,28 @@ impl App {
             // CLAUDETODO: Consider pre-allocating HashSet capacity based on expected request count
             // to reduce rehashing. E.g., HashSet::with_capacity(1000) for typical usage
             seen_request_ids: HashSet::new(),
-            file_tracker: Some(file_tracker),
-            use_incremental: true, // Enable by default
+            _file_tracker: Some(file_tracker),
+            _use_incremental: true, // Enable by default
         }
     }
 
     pub fn refresh_data(&mut self) -> Result<()> {
         // Parse logs from the last N hours
         let start_date = Utc::now() - Duration::hours(24); // Always fetch 24h for feed
-        // CLAUDETODO: Cloning claude_dir String on every refresh is inefficient. 
-        // Consider storing &str in LogParser or using Arc<String> if sharing is needed
         let parser = LogParser::new(self.claude_dir.clone())
             .with_date_range(Some(start_date), None)
             .quiet();
         
-        // CLAUDETODO: parse_logs() re-reads and re-parses ALL files every time, even if nothing changed.
-        // Consider:
-        // 1. Caching file modification times and only parsing changed files
-        // 2. Keeping a persistent index of parsed data with timestamps
-        // 3. Using inotify/FSEvents to watch for file changes instead of polling
-        let entries = parser.parse_logs()?;
+        // Use incremental parsing if available
+        let entries = if let Some(ref mut tracker) = self._file_tracker {
+            if self._use_incremental {
+                parser.parse_logs_incremental(tracker)?
+            } else {
+                parser.parse_logs()?
+            }
+        } else {
+            parser.parse_logs()?
+        };
         
         // On first load, clear everything and ensure proper sorting
         let is_first_load = self.seen_request_ids.is_empty();

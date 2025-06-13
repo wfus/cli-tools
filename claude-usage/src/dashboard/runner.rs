@@ -17,7 +17,7 @@ use super::ui;
 use crate::model_name::ModelName;
 
 pub async fn run_dashboard(
-    refresh_seconds: u64,
+    refresh_seconds: f64,
     initial_hours: usize,
     initial_model: Option<String>,
     claude_dir: String,
@@ -40,7 +40,7 @@ pub async fn run_dashboard(
     // Initial data load
     app.refresh_data()?;
 
-    let res = run_app(&mut terminal, app, Duration::from_secs(refresh_seconds)).await;
+    let res = run_app(&mut terminal, app, Duration::from_secs_f64(refresh_seconds)).await;
 
     // Restore terminal
     disable_raw_mode()?;

@@ -45,8 +45,12 @@ pub struct RollingWindow {
 
 impl RollingWindow {
     pub fn new(window_minutes: usize) -> Self {
+        // Always allocate capacity for at least 24 hours of data
+        let min_capacity = 24 * 60; // 24 hours in minutes
+        let capacity = window_minutes.max(min_capacity);
+        
         Self {
-            buckets: VecDeque::with_capacity(window_minutes),
+            buckets: VecDeque::with_capacity(capacity),
             window_minutes,
         }
     }
@@ -93,10 +97,18 @@ impl RollingWindow {
     }
 
     fn trim_old_buckets(&mut self) {
-        // Keep buckets for 5 minutes longer than the window to ensure stats calculations
-        // at the boundary don't miss any data
+        // Always keep at least 24 hours of data for the stats panels
+        // This ensures 5h and 24h stats work correctly regardless of chart view
+        let min_retention_hours = 24;
+        let min_retention_minutes = min_retention_hours * 60;
+        
+        // Use the larger of the window size or minimum retention
+        let retention_minutes = self.window_minutes.max(min_retention_minutes);
+        
+        // Add a small buffer to ensure stats calculations at boundaries don't miss data
         let buffer_minutes = 5;
-        let cutoff = Utc::now() - Duration::minutes((self.window_minutes + buffer_minutes) as i64);
+        let cutoff = Utc::now() - Duration::minutes((retention_minutes + buffer_minutes) as i64);
+        
         while let Some(bucket) = self.buckets.front() {
             if bucket.timestamp < cutoff {
                 self.buckets.pop_front();

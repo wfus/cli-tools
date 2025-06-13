@@ -36,6 +36,12 @@ pub struct FileTracker {
     state_file: Option<PathBuf>,
 }
 
+impl Default for FileTracker {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl FileTracker {
     pub fn new() -> Self {
         Self {

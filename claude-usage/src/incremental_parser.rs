@@ -1,11 +1,9 @@
 use crate::file_tracker::{FileCheckResult, FileTracker};
 use crate::models::LogEntry;
 use anyhow::{Context, Result};
-use chrono::{DateTime, Utc};
 use std::fs::File;
 use std::io::{BufRead, BufReader, Seek, SeekFrom};
 use std::path::Path;
-use walkdir::WalkDir;
 
 /// Extension trait for LogParser to add incremental parsing capabilities
 pub trait IncrementalParsing {

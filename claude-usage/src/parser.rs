@@ -6,15 +6,16 @@ use std::collections::HashMap;
 use std::fs::File;
 use std::io::{BufRead, BufReader};
 use std::path::Path;
+use std::time::Instant;
 use walkdir::WalkDir;
 
 pub struct LogParser {
     // CLAUDETODO: Consider using &str or Path instead of String to avoid unnecessary allocations
     // when the claude_dir is only read and not modified. This would require lifetime parameters.
-    claude_dir: String,
+    pub(crate) claude_dir: String,
     start_date: Option<DateTime<Utc>>,
     end_date: Option<DateTime<Utc>>,
-    quiet: bool,
+    pub(crate) quiet: bool,
 }
 
 impl LogParser {
@@ -43,6 +44,8 @@ impl LogParser {
     }
 
     pub fn parse_logs(&self) -> Result<Vec<LogEntry>> {
+        let total_start = Instant::now();
+        
         let expanded_path = shellexpand::tilde(&self.claude_dir).into_owned();
         let projects_dir = Path::new(&expanded_path).join("projects");
 
@@ -53,9 +56,14 @@ impl LogParser {
             );
         }
 
+        // Phase 1: File discovery
+        let file_discovery_start = Instant::now();
         let jsonl_files = self.find_jsonl_files(&projects_dir)?;
+        let file_discovery_time = file_discovery_start.elapsed();
+        
         if !self.quiet {
             println!("Found {} JSONL files to process", jsonl_files.len());
+            println!("File discovery took: {:.2}ms", file_discovery_time.as_millis());
         }
 
         let pb = if self.quiet {
@@ -70,28 +78,79 @@ impl LogParser {
                 .progress_chars("#>-"),
         );
 
+        // Phase 2: Parsing files
+        let parsing_start = Instant::now();
         // CLAUDETODO: Consider pre-allocating Vec capacity based on estimated entries per file
         // to reduce reallocations during extend operations. Could sample first few files to estimate.
         let mut all_entries = Vec::new();
+        let mut total_lines_parsed = 0usize;
+        let mut files_with_errors = 0usize;
+        let mut slow_files = Vec::new();
 
-        for file_path in jsonl_files {
+        for file_path in &jsonl_files {
             pb.inc(1);
-            match self.parse_jsonl_file(&file_path) {
-                Ok(entries) => all_entries.extend(entries),
-                Err(e) => eprintln!("Error parsing {}: {}", file_path.display(), e),
+            let file_start = Instant::now();
+            match self.parse_jsonl_file(file_path) {
+                Ok(entries) => {
+                    let file_time = file_start.elapsed();
+                    if file_time.as_millis() > 100 {  // Log files that take > 100ms
+                        slow_files.push((file_path.clone(), file_time, entries.len()));
+                    }
+                    total_lines_parsed += entries.len();
+                    all_entries.extend(entries);
+                },
+                Err(e) => {
+                    files_with_errors += 1;
+                    eprintln!("Error parsing {}: {}", file_path.display(), e);
+                },
             }
         }
 
         pb.finish_with_message("Parsing complete");
+        let parsing_time = parsing_start.elapsed();
+        
+        if !self.quiet {
+            println!("Parsing took: {:.2}s for {} entries from {} files", parsing_time.as_secs_f32(), total_lines_parsed, jsonl_files.len());
+            if files_with_errors > 0 {
+                println!("  {} files had errors", files_with_errors);
+            }
+            if !slow_files.is_empty() {
+                println!("  Slowest files (>100ms):");
+                slow_files.sort_by(|a, b| b.1.cmp(&a.1));  // Sort by time descending
+                for (path, time, entries) in slow_files.iter().take(5) {
+                    println!("    {:>6.0}ms - {} ({} entries)", 
+                        time.as_millis(), 
+                        path.file_name().unwrap_or_default().to_string_lossy(),
+                        entries);
+                }
+            }
+        }
 
-        // Filter by date range if specified
+        // Phase 3: Filtering by date
+        let filter_start = Instant::now();
         let filtered_entries = self.filter_by_date(all_entries);
-
-        // Deduplicate entries
-        Ok(self.deduplicate_entries(filtered_entries))
+        let filter_time = filter_start.elapsed();
+        
+        // Phase 4: Deduplication
+        let dedup_start = Instant::now();
+        let result = self.deduplicate_entries(filtered_entries);
+        let dedup_time = dedup_start.elapsed();
+        
+        let total_time = total_start.elapsed();
+        
+        if !self.quiet {
+            println!("Date filtering took: {:.2}ms", filter_time.as_millis());
+            println!("Deduplication took: {:.2}ms", dedup_time.as_millis());
+            println!("----------------------------------------");
+            println!("Total parse_logs time: {:.2}s", total_time.as_secs_f32());
+            println!("Final entry count: {}", result.len());
+            println!("----------------------------------------");
+        }
+        
+        Ok(result)
     }
 
-    fn find_jsonl_files(&self, dir: &Path) -> Result<Vec<std::path::PathBuf>> {
+    pub(crate) fn find_jsonl_files(&self, dir: &Path) -> Result<Vec<std::path::PathBuf>> {
         let mut files = Vec::new();
 
         for entry in WalkDir::new(dir).max_depth(3) {
@@ -111,7 +170,7 @@ impl LogParser {
         Ok(files)
     }
 
-    fn parse_jsonl_file(&self, path: &Path) -> Result<Vec<LogEntry>> {
+    pub(crate) fn parse_jsonl_file(&self, path: &Path) -> Result<Vec<LogEntry>> {
         let file = File::open(path).context("Failed to open JSONL file")?;
         let reader = BufReader::new(file);
         let mut entries = Vec::new();
@@ -170,7 +229,7 @@ impl LogParser {
         Ok(entries)
     }
 
-    fn filter_by_date(&self, entries: Vec<LogEntry>) -> Vec<LogEntry> {
+    pub(crate) fn filter_by_date(&self, entries: Vec<LogEntry>) -> Vec<LogEntry> {
         // Parse June 4, 2024 date once outside the loop
         let june_4_2024 = DateTime::parse_from_rfc3339("2024-06-04T00:00:00Z")
             .unwrap()
@@ -192,7 +251,7 @@ impl LogParser {
             .collect()
     }
 
-    fn deduplicate_entries(&self, entries: Vec<LogEntry>) -> Vec<LogEntry> {
+    pub(crate) fn deduplicate_entries(&self, entries: Vec<LogEntry>) -> Vec<LogEntry> {
         // CLAUDETODO: This function also takes ownership unnecessarily. Consider using &[LogEntry].
         // Group by request_id and keep only the latest entry for each
         // CLAUDETODO: Consider pre-allocating HashMap capacity based on entries.len() to reduce rehashing.

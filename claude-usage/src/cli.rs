@@ -1,6 +1,18 @@
 use chrono::NaiveDate;
 use clap::{Parser, Subcommand, ValueEnum};
 
+fn parse_refresh_rate(s: &str) -> Result<f64, String> {
+    s.parse::<f64>()
+        .map_err(|_| "Invalid refresh rate".to_string())
+        .and_then(|v| {
+            if v > 0.0 && v <= 60.0 {
+                Ok(v)
+            } else {
+                Err("Refresh rate must be between 0 and 60 seconds".to_string())
+            }
+        })
+}
+
 #[derive(Parser, Debug)]
 #[command(name = "claude-usage")]
 #[command(about = "Analyze Claude Code usage and costs from local logs")]
@@ -19,9 +31,9 @@ pub enum Commands {
     /// Launch interactive dashboard
     #[command(visible_aliases = &["dash", "d"])]
     Dashboard {
-        /// Refresh interval in seconds
-        #[arg(short, long, default_value = "5")]
-        refresh: u64,
+        /// Refresh interval in seconds (supports decimals, e.g. 0.5)
+        #[arg(short, long, default_value = "0.5", value_parser = parse_refresh_rate)]
+        refresh: f64,
         
         /// Initial time range in hours
         #[arg(long, default_value = "1")]

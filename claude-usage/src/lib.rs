@@ -2,7 +2,7 @@ pub mod cli;
 pub mod dashboard;
 pub mod file_tracker;
 pub mod formatters;
-// pub mod incremental_parser;  // Temporarily disabled due to compilation issues
+pub mod incremental_parser;
 pub mod model_name;
 pub mod models;
 pub mod parser;
