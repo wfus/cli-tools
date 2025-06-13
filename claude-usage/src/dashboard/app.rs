@@ -222,6 +222,18 @@ impl App {
 
     pub fn toggle_feed_pause(&mut self) {
         self.feed_paused = !self.feed_paused;
+        
+        // When unpausing, ensure the feed is properly sorted
+        if !self.feed_paused {
+            self.sort_request_feed();
+        }
+    }
+    
+    /// Ensure request feed is sorted with most recent first
+    fn sort_request_feed(&mut self) {
+        let mut temp: Vec<_> = self.request_feed.drain(..).collect();
+        temp.sort_by(|a, b| b.timestamp.cmp(&a.timestamp)); // Reverse order - newest first
+        self.request_feed.extend(temp);
     }
 
     pub fn scroll_feed_up(&mut self) {

@@ -26,7 +26,7 @@ pub fn draw_request_feed(f: &mut Frame, area: Rect, app: &App) {
             let local_time = request.timestamp.with_timezone(&Local);
             let line = vec![
                 Span::raw("["),
-                Span::raw(local_time.format("%H:%M:%S").to_string()),
+                Span::raw(local_time.format("%Y-%m-%d %H:%M:%S").to_string()),
                 Span::raw("] "),
                 Span::styled(
                     format!("{:<8}", request.model.family()),
