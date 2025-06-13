@@ -208,8 +208,8 @@ mod tests {
         std::fs::create_dir_all(&projects_dir).unwrap();
 
         // Create initial file
-        let initial_content = r#"{"type":"assistant","uuid":"test1","timestamp":"2024-12-01T00:00:00Z","entry_type":"assistant","message":{"model":"claude-4-opus-20250514","usage":{"input_tokens":100,"output_tokens":50}}}
-{"type":"assistant","uuid":"test2","timestamp":"2024-12-01T00:01:00Z","entry_type":"assistant","message":{"model":"claude-4-opus-20250514","usage":{"input_tokens":200,"output_tokens":100}}}"#;
+        let initial_content = r#"{"type":"assistant","uuid":"test1","timestamp":"2024-12-01T00:00:00Z","sessionId":"test-session","requestId":"req1","message":{"model":"claude-opus-4-20250514","usage":{"input_tokens":100,"output_tokens":50,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}
+{"type":"assistant","uuid":"test2","timestamp":"2024-12-01T00:01:00Z","sessionId":"test-session","requestId":"req2","message":{"model":"claude-opus-4-20250514","usage":{"input_tokens":200,"output_tokens":100,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
 
         let file_path = create_test_jsonl_file(&projects_dir, "test.jsonl", initial_content);
 
@@ -227,7 +227,7 @@ mod tests {
 
         // Append new content
         let new_content = r#"
-{"type":"assistant","uuid":"test3","timestamp":"2024-12-01T00:02:00Z","entry_type":"assistant","message":{"model":"claude-4-opus-20250514","usage":{"input_tokens":150,"output_tokens":75}}}"#;
+{"type":"assistant","uuid":"test3","timestamp":"2024-12-01T00:02:00Z","sessionId":"test-session","requestId":"req3","message":{"model":"claude-opus-4-20250514","usage":{"input_tokens":150,"output_tokens":75,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
 
         let mut file = std::fs::OpenOptions::new()
             .append(true)
@@ -252,14 +252,14 @@ mod tests {
             .quiet();
 
         // Create and parse initial file
-        let initial_content = r#"{"type":"assistant","uuid":"test1","timestamp":"2024-12-01T00:00:00Z","entry_type":"assistant","message":{"model":"claude-4-opus-20250514","usage":{"input_tokens":100,"output_tokens":50}}}"#;
+        let initial_content = r#"{"type":"assistant","uuid":"test1","timestamp":"2024-12-01T00:00:00Z","sessionId":"test-session","requestId":"req1","message":{"model":"claude-opus-4-20250514","usage":{"input_tokens":100,"output_tokens":50,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
         let file_path = create_test_jsonl_file(&projects_dir, "test.jsonl", initial_content);
 
         let entries1 = parser.parse_logs_incremental(&mut tracker).unwrap();
         assert_eq!(entries1.len(), 1);
 
         // Simulate rotation - write shorter content
-        let rotated_content = r#"{"type":"assistant","uuid":"test2","timestamp":"2024-12-01T01:00:00Z","entry_type":"assistant","message":{"model":"claude-4-opus-20250514","usage":{"input_tokens":50,"output_tokens":25}}}"#;
+        let rotated_content = r#"{"type":"assistant","uuid":"test2","timestamp":"2024-12-01T01:00:00Z","sessionId":"test-session","requestId":"req2-new","message":{"model":"claude-opus-4-20250514","usage":{"input_tokens":50,"output_tokens":25,"cache_creation_input_tokens":0,"cache_read_input_tokens":0}}}"#;
         std::fs::write(&file_path, rotated_content).unwrap();
 
         // Should detect rotation and reparse entire file

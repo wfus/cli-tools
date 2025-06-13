@@ -285,6 +285,7 @@ dependencies = [
  "serde",
  "serde_json",
  "shellexpand",
+ "tempfile",
  "thiserror 1.0.69",
  "tokio",
  "unicode-width 0.1.14",

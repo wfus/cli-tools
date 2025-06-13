@@ -42,7 +42,7 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
         Span::styled(model_text, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
         Span::raw(" ▼ | Last Update: "),
         Span::raw(local_update_time.format("%H:%M:%S").to_string()),
-        Span::raw(" | Auto-refresh: 5s"),
+        Span::raw(format!(" | Auto-refresh: {}s", app.refresh_rate)),
     ];
 
     let header = Paragraph::new(Line::from(header_text))

@@ -9,7 +9,9 @@ use ratatui::{
 use crate::dashboard::app::App;
 
 pub fn draw_summary_bar(f: &mut Frame, area: Rect, app: &App) {
-    let (total_cost, model_costs) = app.rolling_window.get_24h_stats_simple();
+    let stats = app.rolling_window.get_24h_stats(None);
+    let total_cost = stats.cost;
+    let model_costs = &stats.model_costs;
 
     let mut spans = vec![
         Span::raw("Total: "),
@@ -20,8 +22,8 @@ pub fn draw_summary_bar(f: &mut Frame, area: Rect, app: &App) {
     ];
 
     // Add model breakdowns
-    let mut model_entries: Vec<_> = model_costs.into_iter().collect();
-    model_entries.sort_by(|a, b| b.1.partial_cmp(&a.1).unwrap());
+    let mut model_entries: Vec<_> = model_costs.iter().collect();
+    model_entries.sort_by(|a, b| b.1.partial_cmp(a.1).unwrap());
 
     for (model, cost) in model_entries {
         let color = match model.as_str() {
@@ -33,7 +35,7 @@ pub fn draw_summary_bar(f: &mut Frame, area: Rect, app: &App) {
 
         spans.push(Span::raw(" │ "));
         spans.push(Span::styled(
-            format!("{}: ", capitalize(&model)),
+            format!("{}: ", capitalize(model)),
             Style::default().fg(color),
         ));
         spans.push(Span::styled(

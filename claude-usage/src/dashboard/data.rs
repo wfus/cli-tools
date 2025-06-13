@@ -3,6 +3,14 @@ use chrono::{DateTime, Duration, Timelike, Utc};
 use std::collections::{HashMap, VecDeque};
 
 #[derive(Debug, Clone)]
+pub struct TimeRangeStats {
+    pub requests: u32,
+    pub tokens: u64,
+    pub cost: f64,
+    pub model_costs: HashMap<String, f64>,
+}
+
+#[derive(Debug, Clone)]
 pub struct RequestInfo {
     pub timestamp: DateTime<Utc>,
     pub model: ModelName,
@@ -128,8 +136,9 @@ impl RollingWindow {
         }).collect()
     }
 
-    pub fn get_current_hour_stats(&self, model_filter: Option<&ModelName>) -> (u32, u64, f64, HashMap<String, f64>) {
-        let cutoff = Utc::now() - Duration::hours(1);
+    /// Get stats for a specific time range
+    fn get_time_range_stats(&self, hours: i64, model_filter: Option<&ModelName>) -> TimeRangeStats {
+        let cutoff = Utc::now() - Duration::hours(hours);
         let mut total_requests = 0u32;
         let mut total_tokens = 0u64;
         let mut total_cost = 0.0;
@@ -151,73 +160,23 @@ impl RollingWindow {
             }
         }
 
-        (total_requests, total_tokens, total_cost, model_costs)
+        TimeRangeStats {
+            requests: total_requests,
+            tokens: total_tokens,
+            cost: total_cost,
+            model_costs,
+        }
+    }
+    
+    pub fn get_current_hour_stats(&self, model_filter: Option<&ModelName>) -> TimeRangeStats {
+        self.get_time_range_stats(1, model_filter)
     }
 
-    pub fn get_5h_stats(&self, model_filter: Option<&ModelName>) -> (u32, u64, f64, HashMap<String, f64>) {
-        let cutoff = Utc::now() - Duration::hours(5);
-        let mut total_requests = 0u32;
-        let mut total_tokens = 0u64;
-        let mut total_cost = 0.0;
-        let mut model_costs = HashMap::new();
-
-        for bucket in &self.buckets {
-            if bucket.timestamp >= cutoff {
-                for request in &bucket.requests {
-                    if model_filter.is_none() || request.model.family() == model_filter.unwrap().family() {
-                        total_requests += 1;
-                        total_tokens += (request.input_tokens + request.output_tokens + request.cache_tokens) as u64;
-                        total_cost += request.cost;
-                    }
-                }
-                
-                for (model, cost) in &bucket.model_costs {
-                    *model_costs.entry(model.clone()).or_insert(0.0) += cost;
-                }
-            }
-        }
-
-        (total_requests, total_tokens, total_cost, model_costs)
+    pub fn get_5h_stats(&self, model_filter: Option<&ModelName>) -> TimeRangeStats {
+        self.get_time_range_stats(5, model_filter)
     }
 
-    pub fn get_24h_stats(&self, model_filter: Option<&ModelName>) -> (u32, u64, f64, HashMap<String, f64>) {
-        let cutoff = Utc::now() - Duration::hours(24);
-        let mut total_requests = 0u32;
-        let mut total_tokens = 0u64;
-        let mut total_cost = 0.0;
-        let mut model_costs = HashMap::new();
-
-        for bucket in &self.buckets {
-            if bucket.timestamp >= cutoff {
-                for request in &bucket.requests {
-                    if model_filter.is_none() || request.model.family() == model_filter.unwrap().family() {
-                        total_requests += 1;
-                        total_tokens += (request.input_tokens + request.output_tokens + request.cache_tokens) as u64;
-                        total_cost += request.cost;
-                    }
-                }
-                
-                for (model, cost) in &bucket.model_costs {
-                    *model_costs.entry(model.clone()).or_insert(0.0) += cost;
-                }
-            }
-        }
-
-        (total_requests, total_tokens, total_cost, model_costs)
-    }
-
-    // Keep the old method for backward compatibility
-    pub fn get_24h_stats_simple(&self) -> (f64, HashMap<String, f64>) {
-        let mut total_cost = 0.0;
-        let mut model_costs = HashMap::new();
-
-        for bucket in &self.buckets {
-            total_cost += bucket.total_cost;
-            for (model, cost) in &bucket.model_costs {
-                *model_costs.entry(model.clone()).or_insert(0.0) += cost;
-            }
-        }
-
-        (total_cost, model_costs)
+    pub fn get_24h_stats(&self, model_filter: Option<&ModelName>) -> TimeRangeStats {
+        self.get_time_range_stats(24, model_filter)
     }
 }

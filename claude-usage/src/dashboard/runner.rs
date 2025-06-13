@@ -30,7 +30,7 @@ pub async fn run_dashboard(
     let mut terminal = Terminal::new(backend)?;
 
     // Create app state
-    let mut app = App::new(claude_dir, initial_hours);
+    let mut app = App::new(claude_dir, initial_hours, refresh_seconds);
     if let Some(model_str) = initial_model {
         // Try to parse the model string into a ModelName
         let model_name = ModelName::from_model_string(&model_str);

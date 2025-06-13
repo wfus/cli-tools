@@ -66,6 +66,7 @@ pub struct App {
     pub feed_scroll: usize,
     pub feed_paused: bool,
     pub last_update: DateTime<Utc>,
+    pub refresh_rate: f64,
     // CLAUDETODO: pricing_map is loaded once but never updated. If pricing rarely changes,
     // consider making it a global static or lazy_static to avoid storing in every App instance
     pub pricing_map: crate::models::PricingMap,
@@ -79,7 +80,7 @@ pub struct App {
 }
 
 impl App {
-    pub fn new(claude_dir: String, initial_hours: usize) -> Self {
+    pub fn new(claude_dir: String, initial_hours: usize, refresh_rate: f64) -> Self {
         let time_range = match initial_hours {
             1 => TimeRange::OneHour,
             2 => TimeRange::TwoHours,
@@ -108,6 +109,7 @@ impl App {
             feed_scroll: 0,
             feed_paused: false,
             last_update: Utc::now(),
+            refresh_rate,
             pricing_map: get_default_pricing(),
             // CLAUDETODO: Consider pre-allocating HashSet capacity based on expected request count
             // to reduce rehashing. E.g., HashSet::with_capacity(1000) for typical usage
@@ -124,19 +126,27 @@ impl App {
             .with_date_range(Some(start_date), None)
             .quiet();
         
-        // Use incremental parsing if available
+        // On first load, clear everything and ensure proper sorting
+        let is_first_load = self.seen_request_ids.is_empty();
+        
+        // Use incremental parsing if available, but do full load on first run
         let entries = if let Some(ref mut tracker) = self._file_tracker {
-            if self._use_incremental {
+            if self._use_incremental && !is_first_load {
                 parser.parse_logs_incremental(tracker)?
             } else {
-                parser.parse_logs()?
+                // First load or incremental disabled - do full parse
+                let entries = parser.parse_logs()?;
+                // Update tracker with all files so next refresh is incremental
+                if is_first_load && self._use_incremental {
+                    // Force tracker to scan all files
+                    let _ = parser.parse_logs_incremental(tracker);
+                }
+                entries
             }
         } else {
             parser.parse_logs()?
         };
         
-        // On first load, clear everything and ensure proper sorting
-        let is_first_load = self.seen_request_ids.is_empty();
         if is_first_load {
             self.rolling_window.clear();
             self.request_feed.clear();
@@ -192,6 +202,11 @@ impl App {
                     self.request_feed.pop_back();
                 }
             }
+        }
+        
+        // On first load, ensure feed is sorted properly (newest first)
+        if is_first_load {
+            self.sort_request_feed();
         }
         
         self.last_update = Utc::now();
