@@ -137,3 +137,29 @@ These are expected for:
   - Silently skip summary entries (no usage data)
   - Suppress warnings for known missing fields (id, uuid)
   - Only warn about truly unexpected formats
+
+## TODO: Type Safety Improvements
+
+### Use Strong Types Instead of Strings
+- Replace `String` for model names with an enum or newtype wrapper
+- Example:
+  ```rust
+  #[derive(Debug, Clone, PartialEq, Eq, Hash)]
+  enum ModelName {
+      Opus4,
+      Sonnet4,
+      Haiku3,
+      Sonnet3_5,
+      Unknown(String), // For forward compatibility
+  }
+  ```
+- Benefits:
+  - Compile-time checking for model names
+  - Prevents typos and mismatches
+  - Easier refactoring
+  - Better IDE support
+- Areas to update:
+  - `LogEntry` struct
+  - `Message` struct
+  - `ModelPricing` keys
+  - Model filter in CLI args and dashboard
