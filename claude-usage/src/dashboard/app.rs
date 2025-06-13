@@ -86,7 +86,8 @@ impl App {
         // Parse logs from the last N hours
         let start_date = Utc::now() - Duration::hours(24); // Always fetch 24h for feed
         let parser = LogParser::new(self.claude_dir.clone())
-            .with_date_range(Some(start_date), None);
+            .with_date_range(Some(start_date), None)
+            .quiet();
         
         let entries = parser.parse_logs()?;
         

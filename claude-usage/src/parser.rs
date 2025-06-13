@@ -12,6 +12,7 @@ pub struct LogParser {
     claude_dir: String,
     start_date: Option<DateTime<Utc>>,
     end_date: Option<DateTime<Utc>>,
+    quiet: bool,
 }
 
 impl LogParser {
@@ -20,6 +21,7 @@ impl LogParser {
             claude_dir,
             start_date: None,
             end_date: None,
+            quiet: false,
         }
     }
 
@@ -30,6 +32,11 @@ impl LogParser {
     ) -> Self {
         self.start_date = start;
         self.end_date = end;
+        self
+    }
+
+    pub fn quiet(mut self) -> Self {
+        self.quiet = true;
         self
     }
 
@@ -45,9 +52,15 @@ impl LogParser {
         }
 
         let jsonl_files = self.find_jsonl_files(&projects_dir)?;
-        println!("Found {} JSONL files to process", jsonl_files.len());
+        if !self.quiet {
+            println!("Found {} JSONL files to process", jsonl_files.len());
+        }
 
-        let pb = ProgressBar::new(jsonl_files.len() as u64);
+        let pb = if self.quiet {
+            ProgressBar::hidden()
+        } else {
+            ProgressBar::new(jsonl_files.len() as u64)
+        };
         pb.set_style(
             ProgressStyle::default_bar()
                 .template("{spinner:.green} [{bar:40.cyan/blue}] {pos}/{len} files")
@@ -124,7 +137,7 @@ impl LogParser {
                 Err(e) => {
                     // Only warn about parsing errors for non-summary entries
                     // and only for the first few lines to avoid spam
-                    if line_num < 5 {
+                    if !self.quiet && line_num < 5 {
                         // Check if it's a known issue (missing fields in older formats)
                         let error_str = e.to_string();
                         if !error_str.contains("missing field `id`") && !error_str.contains("missing field `uuid`") {
