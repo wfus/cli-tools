@@ -49,7 +49,7 @@ pub fn format_table(stats: &[UsageStats], detailed: bool, show_summary: bool) ->
                 Cell::new(&format_number(stat.usage.cache_creation_input_tokens)),
                 Cell::new(&format_number(stat.usage.cache_read_input_tokens)),
                 Cell::new(&format_number(stat.usage.total_tokens())),
-                Cell::new(&format!("${:.4}", stat.cost_usd)).style_spec("Fg"),
+                Cell::new(&format!("${:.2}", stat.cost_usd)).style_spec("Fg"),
             ]));
         } else {
             table.add_row(Row::new(vec![
@@ -57,7 +57,7 @@ pub fn format_table(stats: &[UsageStats], detailed: bool, show_summary: bool) ->
                 Cell::new(&stat.model.to_string()),
                 Cell::new(&stat.request_count.to_string()),
                 Cell::new(&format_number(stat.usage.total_tokens())),
-                Cell::new(&format!("${:.4}", stat.cost_usd)).style_spec("Fg"),
+                Cell::new(&format!("${:.2}", stat.cost_usd)).style_spec("Fg"),
             ]));
         }
     }
@@ -76,7 +76,7 @@ pub fn format_table(stats: &[UsageStats], detailed: bool, show_summary: bool) ->
                     .style_spec("bFy"),
                 Cell::new(&format_number(total_usage.cache_read_input_tokens)).style_spec("bFy"),
                 Cell::new(&format_number(total_usage.total_tokens())).style_spec("bFy"),
-                Cell::new(&format!("${:.4}", total_cost)).style_spec("bFgY"),
+                Cell::new(&format!("${:.2}", total_cost)).style_spec("bFgY"),
             ]));
         } else {
             table.add_row(Row::new(vec![
@@ -84,7 +84,7 @@ pub fn format_table(stats: &[UsageStats], detailed: bool, show_summary: bool) ->
                 Cell::new("").style_spec("bFy"),
                 Cell::new(&total_requests.to_string()).style_spec("bFy"),
                 Cell::new(&format_number(total_usage.total_tokens())).style_spec("bFy"),
-                Cell::new(&format!("${:.4}", total_cost)).style_spec("bFgY"),
+                Cell::new(&format!("${:.2}", total_cost)).style_spec("bFgY"),
             ]));
         }
     }
@@ -108,7 +108,7 @@ pub fn format_csv(stats: &[UsageStats], detailed: bool) -> String {
     for stat in stats {
         if detailed {
             csv.push_str(&format!(
-                "{},{},{},{},{},{},{},{},{:.4}\n",
+                "{},{},{},{},{},{},{},{},{:.2}\n",
                 format_date(&stat.date),
                 stat.model,
                 stat.request_count,
@@ -121,7 +121,7 @@ pub fn format_csv(stats: &[UsageStats], detailed: bool) -> String {
             ));
         } else {
             csv.push_str(&format!(
-                "{},{},{},{},{:.4}\n",
+                "{},{},{},{},{:.2}\n",
                 format_date(&stat.date),
                 stat.model,
                 stat.request_count,
@@ -162,7 +162,7 @@ pub fn format_markdown(stats: &[UsageStats], detailed: bool, show_summary: bool)
 
         if detailed {
             md.push_str(&format!(
-                "| {} | {} | {} | {} | {} | {} | {} | {} | ${:.4} |\n",
+                "| {} | {} | {} | {} | {} | {} | {} | {} | ${:.2} |\n",
                 format_date(&stat.date),
                 stat.model,
                 stat.request_count,
@@ -175,7 +175,7 @@ pub fn format_markdown(stats: &[UsageStats], detailed: bool, show_summary: bool)
             ));
         } else {
             md.push_str(&format!(
-                "| {} | {} | {} | {} | ${:.4} |\n",
+                "| {} | {} | {} | {} | ${:.2} |\n",
                 format_date(&stat.date),
                 stat.model,
                 stat.request_count,
@@ -189,7 +189,7 @@ pub fn format_markdown(stats: &[UsageStats], detailed: bool, show_summary: bool)
     if show_summary {
         if detailed {
             md.push_str(&format!(
-                "| **TOTAL** | | **{}** | **{}** | **{}** | **{}** | **{}** | **{}** | **${:.4}** |\n",
+                "| **TOTAL** | | **{}** | **{}** | **{}** | **{}** | **{}** | **{}** | **${:.2}** |\n",
                 total_requests,
                 format_number(total_usage.input_tokens),
                 format_number(total_usage.output_tokens),
@@ -200,7 +200,7 @@ pub fn format_markdown(stats: &[UsageStats], detailed: bool, show_summary: bool)
             ));
         } else {
             md.push_str(&format!(
-                "| **TOTAL** | | **{}** | **{}** | **${:.4}** |\n",
+                "| **TOTAL** | | **{}** | **{}** | **${:.2}** |\n",
                 total_requests,
                 format_number(total_usage.total_tokens()),
                 total_cost
@@ -259,7 +259,7 @@ pub fn print_summary(stats: &[UsageStats]) {
         "  Total Tokens: {}",
         format_number(total_usage.total_tokens()).green()
     );
-    println!("  Total Cost: {}", format!("${:.4}", total_cost).green().bold());
+    println!("  Total Cost: {}", format!("${:.2}", total_cost).green().bold());
 
     println!("\n{}", "Token Breakdown:".yellow());
     println!(
@@ -287,6 +287,6 @@ pub fn print_summary(stats: &[UsageStats]) {
         println!("\n  {}:", model.bright_blue());
         println!("    Requests: {}", format_number(requests));
         println!("    Tokens: {}", format_number(usage.total_tokens()));
-        println!("    Cost: {}", format!("${:.4}", cost).green());
+        println!("    Cost: {}", format!("${:.2}", cost).green());
     }
 }
