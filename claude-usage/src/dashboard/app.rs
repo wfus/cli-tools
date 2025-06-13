@@ -3,7 +3,7 @@ use crate::parser::LogParser;
 use crate::pricing::get_default_pricing;
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
-use std::collections::VecDeque;
+use std::collections::{HashSet, VecDeque};
 
 use super::data::{RequestInfo, RollingWindow};
 
@@ -54,6 +54,7 @@ pub struct App {
     pub feed_paused: bool,
     pub last_update: DateTime<Utc>,
     pub pricing_map: crate::models::PricingMap,
+    seen_request_ids: HashSet<String>,
 }
 
 impl App {
@@ -77,6 +78,7 @@ impl App {
             feed_paused: false,
             last_update: Utc::now(),
             pricing_map: get_default_pricing(),
+            seen_request_ids: HashSet::new(),
         }
     }
 
@@ -88,11 +90,20 @@ impl App {
         
         let entries = parser.parse_logs()?;
         
-        // Convert entries to RequestInfo and update rolling window
-        self.rolling_window.clear();
-        self.request_feed.clear();
+        // On first load, clear everything
+        if self.seen_request_ids.is_empty() {
+            self.rolling_window.clear();
+            self.request_feed.clear();
+        }
+        
+        let mut new_requests = Vec::new();
         
         for entry in entries {
+            // Skip if we've already seen this request
+            if self.seen_request_ids.contains(&entry.uuid) {
+                continue;
+            }
+            
             if let Some(message) = &entry.message {
                 if let Some(usage) = &message.usage {
                     if !message.model.is_synthetic() {
@@ -106,13 +117,21 @@ impl App {
                         };
                         
                         self.rolling_window.add_request(request.clone());
-                        self.request_feed.push_front(request);
-                        
-                        // Limit feed size
-                        if self.request_feed.len() > 100 {
-                            self.request_feed.pop_back();
-                        }
+                        new_requests.push(request);
+                        self.seen_request_ids.insert(entry.uuid.clone());
                     }
+                }
+            }
+        }
+        
+        // Add new requests to the feed (most recent first)
+        if !self.feed_paused {
+            for request in new_requests.into_iter().rev() {
+                self.request_feed.push_front(request);
+                
+                // Limit feed size
+                if self.request_feed.len() > 100 {
+                    self.request_feed.pop_back();
                 }
             }
         }
@@ -130,9 +149,10 @@ impl App {
     }
 
     pub async fn on_tick(&mut self) {
-        // In a real implementation, we'd check for new JSONL entries
-        // For now, just update the timestamp
-        self.last_update = Utc::now();
+        // Refresh data from JSONL files
+        if let Err(e) = self.refresh_data().await {
+            eprintln!("Error refreshing data: {}", e);
+        }
     }
 
     pub fn cycle_model_filter(&mut self) {

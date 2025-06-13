@@ -5,6 +5,7 @@ use ratatui::{
     widgets::{Block, Borders, List, ListItem},
     Frame,
 };
+use chrono::Local;
 
 use crate::dashboard::app::App;
 
@@ -22,9 +23,10 @@ pub fn draw_request_feed(f: &mut Frame, area: Rect, app: &App) {
                 _ => Color::White,
             };
 
+            let local_time = request.timestamp.with_timezone(&Local);
             let line = vec![
                 Span::raw("["),
-                Span::raw(request.timestamp.format("%H:%M:%S").to_string()),
+                Span::raw(local_time.format("%H:%M:%S").to_string()),
                 Span::raw("] "),
                 Span::styled(
                     format!("{:<8}", request.model.family()),

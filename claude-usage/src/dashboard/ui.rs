@@ -5,6 +5,7 @@ use ratatui::{
     widgets::{Block, Borders, Paragraph},
     Frame,
 };
+use chrono::Local;
 
 use super::app::{App, ModelFilter};
 use super::widgets::{minute_chart::draw_minute_chart, request_feed::draw_request_feed, stats_panel::draw_stats_panel, summary_bar::draw_summary_bar};
@@ -35,11 +36,12 @@ fn draw_header(f: &mut Frame, area: Rect, app: &App) {
         ModelFilter::Specific(m) => m.to_string(),
     };
 
+    let local_update_time = app.last_update.with_timezone(&Local);
     let header_text = vec![
         Span::raw("Model: "),
         Span::styled(model_text, Style::default().fg(Color::Cyan).add_modifier(Modifier::BOLD)),
         Span::raw(" ▼ | Last Update: "),
-        Span::raw(app.last_update.format("%H:%M:%S").to_string()),
+        Span::raw(local_update_time.format("%H:%M:%S").to_string()),
         Span::raw(" | Auto-refresh: 5s"),
     ];
 
