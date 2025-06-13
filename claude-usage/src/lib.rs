@@ -141,48 +141,50 @@ fn calculate_stats(
     for (_key, (model, entries)) in grouped_data {
         let mut total_usage = TokenUsage::default();
         let mut request_count = 0;
+        let mut total_cost = 0.0;
         let date = entries[0].timestamp;
 
-        for entry in &entries {
-            if let Some(message) = &entry.message {
-                if let Some(usage) = &message.usage {
-                    total_usage.add(usage);
-                    request_count += 1;
+        // When aggregating across all models, calculate cost per entry
+        if model == "all" {
+            for entry in &entries {
+                if let Some(message) = &entry.message {
+                    if let Some(usage) = &message.usage {
+                        total_usage.add(usage);
+                        request_count += 1;
+                        
+                        // Calculate cost for this specific model
+                        if let Some(pricing) = get_model_pricing(pricing_map, &message.model) {
+                            total_cost += pricing.calculate_cost(usage);
+                        } else {
+                            eprintln!("Warning: No pricing found for model: {}", message.model);
+                        }
+                    }
                 }
+            }
+        } else {
+            // For model-specific grouping, use the single model pricing
+            for entry in &entries {
+                if let Some(message) = &entry.message {
+                    if let Some(usage) = &message.usage {
+                        total_usage.add(usage);
+                        request_count += 1;
+                    }
+                }
+            }
+            
+            if let Some(pricing) = get_model_pricing(pricing_map, &model) {
+                total_cost = pricing.calculate_cost(&total_usage);
+            } else {
+                eprintln!("Warning: No pricing found for model: {}", model);
             }
         }
 
-        // Calculate cost
-        let actual_model = if model == "all" {
-            // Find the most common model in this group
-            let mut model_counts: HashMap<String, u32> = HashMap::new();
-            for entry in &entries {
-                if let Some(message) = &entry.message {
-                    *model_counts.entry(message.model.clone()).or_insert(0) += 1;
-                }
-            }
-            model_counts
-                .into_iter()
-                .max_by_key(|(_, count)| *count)
-                .map(|(model, _)| model)
-                .unwrap_or_else(|| "unknown".to_string())
-        } else {
-            model.clone()
-        };
-
-        let cost = if let Some(pricing) = get_model_pricing(pricing_map, &actual_model) {
-            pricing.calculate_cost(&total_usage)
-        } else {
-            eprintln!("Warning: No pricing found for model: {}", actual_model);
-            0.0
-        };
-
         stats.push(UsageStats {
-            model: if model == "all" { actual_model } else { model },
+            model: model.clone(),
             date,
             usage: total_usage,
             request_count,
-            cost_usd: cost,
+            cost_usd: total_cost,
         });
     }
 
