@@ -124,8 +124,9 @@ impl App {
         // 3. Using inotify/FSEvents to watch for file changes instead of polling
         let entries = parser.parse_logs()?;
         
-        // On first load, clear everything
-        if self.seen_request_ids.is_empty() {
+        // On first load, clear everything and ensure proper sorting
+        let is_first_load = self.seen_request_ids.is_empty();
+        if is_first_load {
             self.rolling_window.clear();
             self.request_feed.clear();
         }
@@ -166,10 +167,12 @@ impl App {
             }
         }
         
+        // Sort new requests by timestamp (oldest first)
+        new_requests.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        
         // Add new requests to the feed (most recent first)
         if !self.feed_paused {
-            // CLAUDETODO: into_iter().rev() creates a new iterator. Consider using 
-            // new_requests.reverse() in-place or collecting in reverse order initially
+            // Add in reverse order so newest appears at top
             for request in new_requests.into_iter().rev() {
                 self.request_feed.push_front(request);
                 
