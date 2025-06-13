@@ -43,10 +43,7 @@ impl LogParser {
     }
 
     pub fn parse_logs(&self) -> Result<Vec<LogEntry>> {
-        // CLAUDETODO: shellexpand::tilde returns a Cow<str>, but we're immediately calling to_string()
-        // which causes an unnecessary allocation. Consider using the Cow directly or into_owned()
-        // only when necessary.
-        let expanded_path = shellexpand::tilde(&self.claude_dir).to_string();
+        let expanded_path = shellexpand::tilde(&self.claude_dir).into_owned();
         let projects_dir = Path::new(&expanded_path).join("projects");
 
         if !projects_dir.exists() {
@@ -174,9 +171,11 @@ impl LogParser {
     }
 
     fn filter_by_date(&self, entries: Vec<LogEntry>) -> Vec<LogEntry> {
-        // CLAUDETODO: This function takes ownership of entries Vec unnecessarily.
-        // Consider taking &[LogEntry] and returning Vec<LogEntry> to avoid moving data.
-        // Also, the june_4_2024 date is computed for every entry - should be a const or lazy_static.
+        // Parse June 4, 2024 date once outside the loop
+        let june_4_2024 = DateTime::parse_from_rfc3339("2024-06-04T00:00:00Z")
+            .unwrap()
+            .with_timezone(&Utc);
+            
         entries
             .into_iter()
             .filter(|entry| {
@@ -188,10 +187,6 @@ impl LogParser {
                 };
 
                 // Only include entries after June 4, 2024
-                // CLAUDETODO: This DateTime is parsed on every iteration! Move outside the loop.
-                let june_4_2024 = DateTime::parse_from_rfc3339("2024-06-04T00:00:00Z")
-                    .unwrap()
-                    .with_timezone(&Utc);
                 in_range && entry.timestamp > june_4_2024
             })
             .collect()
@@ -206,18 +201,14 @@ impl LogParser {
 
         for entry in entries {
             if let Some(request_id) = &entry.request_id {
-                // CLAUDETODO: Cloning request_id on every insert is inefficient. Consider using
-                // entry API: request_map.entry(request_id.clone()).and_modify(|e| {...}).or_insert(entry)
-                match request_map.get(request_id) {
-                    Some(existing) => {
+                // Using entry API to avoid unnecessary cloning
+                request_map.entry(request_id.clone())
+                    .and_modify(|existing| {
                         if entry.timestamp > existing.timestamp {
-                            request_map.insert(request_id.clone(), entry);
+                            *existing = entry.clone();
                         }
-                    }
-                    None => {
-                        request_map.insert(request_id.clone(), entry);
-                    }
-                }
+                    })
+                    .or_insert(entry);
             } else {
                 // Keep entries without request_id (synthetic messages)
                 no_request_id_entries.push(entry);
@@ -229,9 +220,8 @@ impl LogParser {
         let mut result: Vec<LogEntry> = request_map.into_values().collect();
         result.extend(no_request_id_entries);
 
-        // Sort by timestamp
-        // CLAUDETODO: Consider using sort_unstable_by for better performance if stable sort isn't needed
-        result.sort_by(|a, b| a.timestamp.cmp(&b.timestamp));
+        // Sort by timestamp - using unstable sort for better performance
+        result.sort_unstable_by(|a, b| a.timestamp.cmp(&b.timestamp));
 
         result
     }

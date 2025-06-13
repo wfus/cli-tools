@@ -1,9 +1,11 @@
+use crate::file_tracker::FileTracker;
 use crate::model_name::ModelName;
 use crate::parser::LogParser;
 use crate::pricing::get_default_pricing;
 use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
 use std::collections::{HashSet, VecDeque};
+use std::path::PathBuf;
 
 use super::data::{RequestInfo, RollingWindow};
 
@@ -13,9 +15,7 @@ pub enum ModelFilter {
     Specific(ModelName),
 }
 
-// CLAUDETODO: Add Copy trait to TimeRange since it's a simple enum with no data.
-// This would eliminate the need for cloning in App::new()
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum TimeRange {
     OneHour,
     TwoHours,
@@ -24,8 +24,7 @@ pub enum TimeRange {
     TwentyFourHours,
 }
 
-// CLAUDETODO: Add Copy trait to ChartType as well since it's a simple enum
-#[derive(Debug, Clone, PartialEq)]
+#[derive(Debug, Clone, Copy, PartialEq)]
 pub enum ChartType {
     Bar,
     Line,
@@ -74,6 +73,8 @@ pub struct App {
     // 2. Storing only recent UUIDs with a time-based eviction
     // 3. Using u128 or [u8; 16] for UUID storage instead of String
     seen_request_ids: HashSet<String>,
+    file_tracker: Option<FileTracker>,
+    use_incremental: bool,
 }
 
 impl App {
@@ -87,11 +88,16 @@ impl App {
             _ => TimeRange::OneHour,
         };
 
+        // Initialize file tracker for incremental parsing
+        let state_file = PathBuf::from(&claude_dir)
+            .join(".claude-usage")
+            .join("dashboard-file-tracker.json");
+        let file_tracker = FileTracker::with_persistence(state_file);
+        
         Self {
             claude_dir,
             model_filter: ModelFilter::All,
-            // CLAUDETODO: Unnecessary clone of time_range enum. Enums implement Copy, so remove .clone()
-            time_range: time_range.clone(),
+            time_range,
             chart_type: ChartType::Bar,
             rolling_window: RollingWindow::new(time_range.minutes()),
             request_feed: VecDeque::with_capacity(100),
@@ -102,13 +108,12 @@ impl App {
             // CLAUDETODO: Consider pre-allocating HashSet capacity based on expected request count
             // to reduce rehashing. E.g., HashSet::with_capacity(1000) for typical usage
             seen_request_ids: HashSet::new(),
+            file_tracker: Some(file_tracker),
+            use_incremental: true, // Enable by default
         }
     }
 
-    pub async fn refresh_data(&mut self) -> Result<()> {
-        // CLAUDETODO: This function is marked async but contains no await points. 
-        // Either make it sync or add actual async I/O operations (e.g., async file reading)
-        
+    pub fn refresh_data(&mut self) -> Result<()> {
         // Parse logs from the last N hours
         let start_date = Utc::now() - Duration::hours(24); // Always fetch 24h for feed
         // CLAUDETODO: Cloning claude_dir String on every refresh is inefficient. 
@@ -197,11 +202,9 @@ impl App {
         }
     }
 
-    pub async fn on_tick(&mut self) {
-        // CLAUDETODO: This async function only calls one other async function. 
-        // The async overhead might not be worth it for a simple wrapper.
+    pub fn on_tick(&mut self) {
         // Refresh data from JSONL files
-        if let Err(e) = self.refresh_data().await {
+        if let Err(e) = self.refresh_data() {
             eprintln!("Error refreshing data: {}", e);
         }
     }

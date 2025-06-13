@@ -149,7 +149,7 @@ fn draw_line_chart(f: &mut Frame, area: Rect, app: &App) {
     let y_labels: Vec<Span> = (0..=5)
         .map(|i| {
             let value = y_max * (i as f64) / 5.0;
-            Span::raw(format!("${:.3}", value))
+            Span::raw(format!("${:.2}", value))
         })
         .collect();
     

@@ -38,7 +38,7 @@ pub async fn run_dashboard(
     }
 
     // Initial data load
-    app.refresh_data().await?;
+    app.refresh_data()?;
 
     let res = run_app(&mut terminal, app, Duration::from_secs(refresh_seconds)).await;
 
@@ -85,7 +85,7 @@ async fn run_app<B: Backend>(
         }
 
         if last_tick.elapsed() >= tick_rate {
-            app.on_tick().await;
+            app.on_tick();
             last_tick = Instant::now();
         }
     }
