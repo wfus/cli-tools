@@ -42,7 +42,7 @@ pub fn format_table(stats: &[UsageStats], detailed: bool, show_summary: bool) ->
         if detailed {
             table.add_row(Row::new(vec![
                 Cell::new(&format_date(&stat.date)),
-                Cell::new(&stat.model),
+                Cell::new(&stat.model.to_string()),
                 Cell::new(&stat.request_count.to_string()),
                 Cell::new(&format_number(stat.usage.input_tokens)),
                 Cell::new(&format_number(stat.usage.output_tokens)),
@@ -54,7 +54,7 @@ pub fn format_table(stats: &[UsageStats], detailed: bool, show_summary: bool) ->
         } else {
             table.add_row(Row::new(vec![
                 Cell::new(&format_date(&stat.date)),
-                Cell::new(&stat.model),
+                Cell::new(&stat.model.to_string()),
                 Cell::new(&stat.request_count.to_string()),
                 Cell::new(&format_number(stat.usage.total_tokens())),
                 Cell::new(&format!("${:.4}", stat.cost_usd)).style_spec("Fg"),
@@ -246,7 +246,7 @@ pub fn print_summary(stats: &[UsageStats]) {
     let mut model_stats: HashMap<String, (u64, TokenUsage, f64)> = HashMap::new();
     for stat in stats {
         let entry = model_stats
-            .entry(stat.model.clone())
+            .entry(stat.model.to_string())
             .or_insert((0, TokenUsage::default(), 0.0));
         entry.0 += stat.request_count;
         entry.1.add(&stat.usage);

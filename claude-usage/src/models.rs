@@ -1,3 +1,4 @@
+use crate::model_name::ModelName;
 use chrono::{DateTime, Utc};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -24,8 +25,30 @@ pub struct LogEntry {
 pub struct Message {
     pub id: String,
     pub role: String,
-    pub model: String,
+    #[serde(with = "model_name_serde")]
+    pub model: ModelName,
     pub usage: Option<TokenUsage>,
+}
+
+// Custom serde implementation to handle model as string in JSON
+mod model_name_serde {
+    use super::*;
+    use serde::{Deserializer, Serializer};
+    
+    pub fn serialize<S>(model: &ModelName, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        serializer.serialize_str(&model.canonical_string())
+    }
+    
+    pub fn deserialize<'de, D>(deserializer: D) -> Result<ModelName, D::Error>
+    where
+        D: Deserializer<'de>,
+    {
+        let s = String::deserialize(deserializer)?;
+        Ok(ModelName::from_model_string(&s))
+    }
 }
 
 #[derive(Debug, Clone, Default, Serialize, Deserialize)]
@@ -57,7 +80,7 @@ impl TokenUsage {
 
 #[derive(Debug, Clone, Serialize)]
 pub struct UsageStats {
-    pub model: String,
+    pub model: ModelName,
     pub date: DateTime<Utc>,
     pub usage: TokenUsage,
     pub request_count: u64,
@@ -82,4 +105,4 @@ impl ModelPricing {
     }
 }
 
-pub type PricingMap = HashMap<String, ModelPricing>;
+pub type PricingMap = HashMap<ModelName, ModelPricing>;

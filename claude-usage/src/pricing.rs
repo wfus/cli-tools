@@ -1,3 +1,4 @@
+use crate::model_name::ModelName;
 use crate::models::{ModelPricing, PricingMap};
 use anyhow::Result;
 use std::collections::HashMap;
@@ -9,17 +10,7 @@ pub fn get_default_pricing() -> PricingMap {
 
     // Claude 3.5 Sonnet
     pricing.insert(
-        "claude-3-5-sonnet-20241022".to_string(),
-        ModelPricing {
-            input_per_million: 3.0,
-            output_per_million: 15.0,
-            cache_write_per_million: 3.75,
-            cache_read_per_million: 0.30,
-        },
-    );
-
-    pricing.insert(
-        "claude-3-5-sonnet-20240620".to_string(),
+        ModelName::Claude35Sonnet,
         ModelPricing {
             input_per_million: 3.0,
             output_per_million: 15.0,
@@ -30,7 +21,7 @@ pub fn get_default_pricing() -> PricingMap {
 
     // Claude 3.5 Haiku
     pricing.insert(
-        "claude-3-5-haiku-20241022".to_string(),
+        ModelName::Claude35Haiku,
         ModelPricing {
             input_per_million: 0.80,
             output_per_million: 4.0,
@@ -41,7 +32,7 @@ pub fn get_default_pricing() -> PricingMap {
 
     // Claude 3 Opus
     pricing.insert(
-        "claude-3-opus-20240229".to_string(),
+        ModelName::Claude3Opus,
         ModelPricing {
             input_per_million: 15.0,
             output_per_million: 75.0,
@@ -52,7 +43,7 @@ pub fn get_default_pricing() -> PricingMap {
 
     // Claude Opus 4
     pricing.insert(
-        "claude-opus-4-20250514".to_string(),
+        ModelName::Claude4Opus,
         ModelPricing {
             input_per_million: 15.0,
             output_per_million: 75.0,
@@ -63,7 +54,7 @@ pub fn get_default_pricing() -> PricingMap {
 
     // Claude Sonnet 4
     pricing.insert(
-        "claude-sonnet-4-20250514".to_string(),
+        ModelName::Claude4Sonnet,
         ModelPricing {
             input_per_million: 3.0,
             output_per_million: 15.0,
@@ -74,7 +65,7 @@ pub fn get_default_pricing() -> PricingMap {
 
     // Claude 3.7 Sonnet (older version from logs)
     pricing.insert(
-        "claude-3-7-sonnet-20250219".to_string(),
+        ModelName::Claude37Sonnet,
         ModelPricing {
             input_per_million: 3.0,
             output_per_million: 15.0,
@@ -85,7 +76,7 @@ pub fn get_default_pricing() -> PricingMap {
 
     // Claude 3 Haiku
     pricing.insert(
-        "claude-3-haiku-20240307".to_string(),
+        ModelName::Claude3Haiku,
         ModelPricing {
             input_per_million: 0.25,
             output_per_million: 1.25,
@@ -106,31 +97,33 @@ pub async fn fetch_latest_pricing() -> Result<PricingMap> {
     Ok(get_default_pricing())
 }
 
-pub fn get_model_pricing<'a>(pricing_map: &'a PricingMap, model: &'a str) -> Option<&'a ModelPricing> {
+pub fn get_model_pricing<'a>(pricing_map: &'a PricingMap, model: &'a ModelName) -> Option<&'a ModelPricing> {
     // Try exact match first
     if let Some(pricing) = pricing_map.get(model) {
         return Some(pricing);
     }
 
-    // Try to match by model family
-    if model.contains("sonnet") {
-        // Get the latest sonnet pricing
-        for (key, pricing) in pricing_map.iter() {
-            if key.contains("sonnet") && key.contains("20241022") {
-                return Some(pricing);
-            }
+    // For unknown models, try to match by family
+    if let ModelName::Unknown(model_str) = model {
+        let model_parsed = ModelName::from_model_string(model_str);
+        if let Some(pricing) = pricing_map.get(&model_parsed) {
+            return Some(pricing);
         }
-    } else if model.contains("opus") {
-        // Get the latest opus pricing
+        
+        // If still unknown, try family matching
+        let family = if model_str.contains("sonnet") {
+            "sonnet"
+        } else if model_str.contains("opus") {
+            "opus"
+        } else if model_str.contains("haiku") {
+            "haiku"
+        } else {
+            return None;
+        };
+        
+        // Get the first pricing for this family
         for (key, pricing) in pricing_map.iter() {
-            if key.contains("opus") {
-                return Some(pricing);
-            }
-        }
-    } else if model.contains("haiku") {
-        // Get the latest haiku pricing
-        for (key, pricing) in pricing_map.iter() {
-            if key.contains("haiku") && key.contains("20241022") {
+            if key.family() == family {
                 return Some(pricing);
             }
         }
@@ -146,8 +139,8 @@ mod tests {
     #[test]
     fn test_default_pricing() {
         let pricing = get_default_pricing();
-        assert!(pricing.contains_key("claude-3-5-sonnet-20241022"));
-        assert!(pricing.contains_key("claude-3-opus-20240229"));
+        assert!(pricing.contains_key(&ModelName::Claude35Sonnet));
+        assert!(pricing.contains_key(&ModelName::Claude3Opus));
     }
 
     #[test]
@@ -155,9 +148,10 @@ mod tests {
         let pricing = get_default_pricing();
         
         // Test exact match
-        assert!(get_model_pricing(&pricing, "claude-3-5-sonnet-20241022").is_some());
+        assert!(get_model_pricing(&pricing, &ModelName::Claude35Sonnet).is_some());
         
-        // Test family matching
-        assert!(get_model_pricing(&pricing, "claude-3-5-sonnet-unknown").is_some());
+        // Test unknown model parsing
+        let unknown = ModelName::Unknown("claude-3-5-sonnet-unknown".to_string());
+        assert!(get_model_pricing(&pricing, &unknown).is_some());
     }
 }
