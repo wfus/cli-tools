@@ -1,0 +1,155 @@
+use crate::model_name::ModelName;
+use chrono::{DateTime, Duration, Timelike, Utc};
+use std::collections::{HashMap, VecDeque};
+
+#[derive(Debug, Clone)]
+pub struct RequestInfo {
+    pub timestamp: DateTime<Utc>,
+    pub model: ModelName,
+    pub input_tokens: u32,
+    pub output_tokens: u32,
+    pub cache_tokens: u32,
+    pub cost: f64,
+}
+
+#[derive(Debug, Clone)]
+pub struct MinuteBucket {
+    pub timestamp: DateTime<Utc>,
+    pub requests: Vec<RequestInfo>,
+    pub total_cost: f64,
+    pub model_costs: HashMap<String, f64>,
+}
+
+impl MinuteBucket {
+    pub fn new(timestamp: DateTime<Utc>) -> Self {
+        Self {
+            timestamp,
+            requests: Vec::new(),
+            total_cost: 0.0,
+            model_costs: HashMap::new(),
+        }
+    }
+
+    pub fn add_request(&mut self, request: RequestInfo) {
+        let model_key = request.model.family().to_string();
+        *self.model_costs.entry(model_key).or_insert(0.0) += request.cost;
+        self.total_cost += request.cost;
+        self.requests.push(request);
+    }
+}
+
+pub struct RollingWindow {
+    pub buckets: VecDeque<MinuteBucket>,
+    pub window_minutes: usize,
+}
+
+impl RollingWindow {
+    pub fn new(window_minutes: usize) -> Self {
+        Self {
+            buckets: VecDeque::with_capacity(window_minutes),
+            window_minutes,
+        }
+    }
+
+    pub fn clear(&mut self) {
+        self.buckets.clear();
+    }
+
+    pub fn set_window_minutes(&mut self, minutes: usize) {
+        self.window_minutes = minutes;
+        // Trim buckets if needed
+        while self.buckets.len() > minutes {
+            self.buckets.pop_front();
+        }
+    }
+
+    pub fn add_request(&mut self, request: RequestInfo) {
+        // Round timestamp to minute
+        let minute = request.timestamp
+            .with_second(0).unwrap()
+            .with_nanosecond(0).unwrap();
+
+        // Find or create bucket for this minute
+        let bucket_pos = self.buckets.iter().position(|b| b.timestamp == minute);
+        
+        match bucket_pos {
+            Some(pos) => {
+                self.buckets[pos].add_request(request);
+            }
+            None => {
+                // Create new bucket
+                let mut bucket = MinuteBucket::new(minute);
+                bucket.add_request(request);
+                
+                // Insert in correct position to maintain order
+                let insert_pos = self.buckets.iter().position(|b| b.timestamp > minute)
+                    .unwrap_or(self.buckets.len());
+                self.buckets.insert(insert_pos, bucket);
+                
+                // Trim old buckets
+                self.trim_old_buckets();
+            }
+        }
+    }
+
+    fn trim_old_buckets(&mut self) {
+        let cutoff = Utc::now() - Duration::minutes(self.window_minutes as i64);
+        while let Some(bucket) = self.buckets.front() {
+            if bucket.timestamp < cutoff {
+                self.buckets.pop_front();
+            } else {
+                break;
+            }
+        }
+    }
+
+    pub fn get_minute_costs(&self, model_filter: Option<&ModelName>) -> Vec<(DateTime<Utc>, f64)> {
+        self.buckets.iter().map(|bucket| {
+            let cost = match model_filter {
+                Some(model) => bucket.model_costs.get(model.family()).copied().unwrap_or(0.0),
+                None => bucket.total_cost,
+            };
+            (bucket.timestamp, cost)
+        }).collect()
+    }
+
+    pub fn get_current_hour_stats(&self, model_filter: Option<&ModelName>) -> (u32, u64, f64, HashMap<String, f64>) {
+        let cutoff = Utc::now() - Duration::hours(1);
+        let mut total_requests = 0u32;
+        let mut total_tokens = 0u64;
+        let mut total_cost = 0.0;
+        let mut model_costs = HashMap::new();
+
+        for bucket in &self.buckets {
+            if bucket.timestamp >= cutoff {
+                for request in &bucket.requests {
+                    if model_filter.is_none() || request.model.family() == model_filter.unwrap().family() {
+                        total_requests += 1;
+                        total_tokens += (request.input_tokens + request.output_tokens + request.cache_tokens) as u64;
+                        total_cost += request.cost;
+                    }
+                }
+                
+                for (model, cost) in &bucket.model_costs {
+                    *model_costs.entry(model.clone()).or_insert(0.0) += cost;
+                }
+            }
+        }
+
+        (total_requests, total_tokens, total_cost, model_costs)
+    }
+
+    pub fn get_24h_stats(&self) -> (f64, HashMap<String, f64>) {
+        let mut total_cost = 0.0;
+        let mut model_costs = HashMap::new();
+
+        for bucket in &self.buckets {
+            total_cost += bucket.total_cost;
+            for (model, cost) in &bucket.model_costs {
+                *model_costs.entry(model.clone()).or_insert(0.0) += cost;
+            }
+        }
+
+        (total_cost, model_costs)
+    }
+}

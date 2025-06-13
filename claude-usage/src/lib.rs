@@ -1,4 +1,5 @@
 pub mod cli;
+pub mod dashboard;
 pub mod formatters;
 pub mod model_name;
 pub mod models;

@@ -1,10 +1,43 @@
 use chrono::NaiveDate;
-use clap::{Parser, ValueEnum};
+use clap::{Parser, Subcommand, ValueEnum};
 
 #[derive(Parser, Debug)]
 #[command(name = "claude-usage")]
 #[command(about = "Analyze Claude Code usage and costs from local logs")]
 #[command(version)]
+pub struct Cli {
+    #[command(subcommand)]
+    pub command: Option<Commands>,
+}
+
+#[derive(Subcommand, Debug)]
+pub enum Commands {
+    /// Show usage statistics (default)
+    #[command(visible_alias = "stats")]
+    Show(Args),
+    
+    /// Launch interactive dashboard
+    #[command(visible_aliases = &["dash", "d"])]
+    Dashboard {
+        /// Refresh interval in seconds
+        #[arg(short, long, default_value = "5")]
+        refresh: u64,
+        
+        /// Initial time range in hours
+        #[arg(long, default_value = "1")]
+        hours: usize,
+        
+        /// Initial model filter
+        #[arg(short, long)]
+        model: Option<String>,
+        
+        /// Path to Claude logs directory
+        #[arg(long, default_value = "~/.claude")]
+        claude_dir: String,
+    },
+}
+
+#[derive(Parser, Debug)]
 pub struct Args {
     /// Start date for analysis (YYYY-MM-DD)
     #[arg(short, long)]
