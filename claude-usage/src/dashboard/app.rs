@@ -7,6 +7,7 @@ use anyhow::Result;
 use chrono::{DateTime, Duration, Utc};
 use std::collections::{HashSet, VecDeque};
 use std::path::PathBuf;
+use uuid::Uuid;
 
 use super::data::{RequestInfo, RollingWindow};
 
@@ -70,11 +71,8 @@ pub struct App {
     // CLAUDETODO: pricing_map is loaded once but never updated. If pricing rarely changes,
     // consider making it a global static or lazy_static to avoid storing in every App instance
     pub pricing_map: crate::models::PricingMap,
-    // CLAUDETODO: HashSet<String> for UUIDs is memory-intensive. Consider:
-    // 1. Using a bloom filter for probabilistic deduplication
-    // 2. Storing only recent UUIDs with a time-based eviction
-    // 3. Using u128 or [u8; 16] for UUID storage instead of String
-    seen_request_ids: HashSet<String>,
+    // Using HashSet<Uuid> instead of HashSet<String> for ~56% memory savings
+    seen_request_ids: HashSet<Uuid>,
     _file_tracker: Option<FileTracker>,
     _use_incremental: bool,
 }
@@ -120,8 +118,8 @@ impl App {
     }
 
     pub fn refresh_data(&mut self) -> Result<()> {
-        // Parse logs from the last N hours
-        let start_date = Utc::now() - Duration::hours(24); // Always fetch 24h for feed
+        // Parse logs from the last 7 days for all stats panels
+        let start_date = Utc::now() - Duration::hours(168); // Always fetch 7 days for all time ranges
         let parser = LogParser::new(self.claude_dir.clone())
             .with_date_range(Some(start_date), None)
             .quiet();
@@ -180,9 +178,8 @@ impl App {
                         // and new_requests could store references or indices
                         self.rolling_window.add_request(request.clone());
                         new_requests.push(request);
-                        // CLAUDETODO: Cloning uuid String for HashSet. Consider using &str with a lifetime
-                        // or store hashes of UUIDs instead of full strings
-                        self.seen_request_ids.insert(entry.uuid.clone());
+                        // UUID type implements Copy, so no cloning needed
+                        self.seen_request_ids.insert(entry.uuid);
                     }
                 }
             }

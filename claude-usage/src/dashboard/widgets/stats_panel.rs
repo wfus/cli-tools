@@ -13,10 +13,12 @@ pub fn draw_stats_panel(f: &mut Frame, area: Rect, app: &App) {
     let chunks = Layout::default()
         .direction(Direction::Vertical)
         .constraints([
-            Constraint::Length(8),  // Current hour
-            Constraint::Length(8),  // Last 5 hours
-            Constraint::Length(8),  // Last 24 hours
-            Constraint::Min(1),     // Remaining space
+            Constraint::Length(10),  // Current hour
+            Constraint::Length(10),  // Last 5 hours
+            Constraint::Length(10),  // Last 24 hours
+            Constraint::Length(10),  // Last 2 days
+            Constraint::Length(10),  // Last 7 days
+            Constraint::Min(1),      // Remaining space
         ].as_ref())
         .split(area);
 
@@ -28,10 +30,14 @@ pub fn draw_stats_panel(f: &mut Frame, area: Rect, app: &App) {
     let current_stats = app.rolling_window.get_current_hour_stats(model_filter);
     let stats_5h = app.rolling_window.get_5h_stats(model_filter);
     let stats_24h = app.rolling_window.get_24h_stats(model_filter);
+    let stats_2d = app.rolling_window.get_2d_stats(model_filter);
+    let stats_7d = app.rolling_window.get_7d_stats(model_filter);
 
     draw_stats_widget(f, chunks[0], &current_stats, " Current Hour Stats ");
     draw_stats_widget(f, chunks[1], &stats_5h, " Last 5 Hours ");
     draw_stats_widget(f, chunks[2], &stats_24h, " Last 24 Hours ");
+    draw_stats_widget(f, chunks[3], &stats_2d, " Last 2 Days ");
+    draw_stats_widget(f, chunks[4], &stats_7d, " Last 7 Days ");
 }
 
 fn draw_stats_widget(f: &mut Frame, area: Rect, stats: &TimeRangeStats, title: &str) {
